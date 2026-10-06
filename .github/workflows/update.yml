@@ -1,0 +1,27 @@
+name: Update DSE prices
+on:
+  schedule:
+    - cron: '*/15 4-9 * * 0-4'
+    - cron: '0 10 * * 4'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch prices from DSE
+        run: |
+          curl -sS --retry 5 --retry-all-errors -A "Mozilla/5.0" \
+            https://dsebd.org/api/live/prices -o prices.json \
+          || curl -ksS --retry 5 -A "Mozilla/5.0" \
+            https://dsebd.org/api/live/prices -o prices.json
+          python3 -c "import json; d=json.load(open('prices.json')); assert len(d.get('rows',[]))>50, 'bad data'"
+      - name: Commit and push
+        run: |
+          git config user.name "dse-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add prices.json
+          git commit -m "prices update" || echo "no changes"
+          git push || true
